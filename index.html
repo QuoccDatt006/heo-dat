@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heo Đất Tiết Kiệm - Quản Lý Mục Tiêu Tài Chính</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fdf2f8',
+                            100: '#fce7f3',
+                            200: '#fbcfe8',
+                            500: '#ec4899',
+                            600: '#db2777',
+                            700: '#be185d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbar for transaction list */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Subtle background mesh */
+        .bg-mesh {
+            background-color: #f8fafc;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(327, 73%, 94%, 0.7) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(217, 91%, 94%, 0.7) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, hsla(152, 76%, 94%, 0.6) 0px, transparent 50%);
+        }
+
+        /* Glass card effect */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+
+        /* Piggy bounce animation on deposit */
+        @keyframes piggyBounce {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.15) rotate(-6deg); }
+            50% { transform: scale(0.95) rotate(6deg); }
+            75% { transform: scale(1.08) rotate(-3deg); }
+        }
+        .animate-piggy {
+            animation: piggyBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Confetti canvas overlay */
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body class="bg-mesh min-h-screen text-slate-800 antialiased selection:bg-pink-200 selection:text-pink-900 pb-12">
+
+    <!-- Canvas cho hiệu ứng pháo giấy ăn mừng -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- Header -->
+    <header class="max-w-5xl mx-auto px-4 pt-6 pb-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div id="header-piggy" class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-400 flex items-center justify-center text-white shadow-lg shadow-pink-500/25 text-2xl select-none cursor-pointer transition-transform hover:scale-105" title="Bấm vào tôi!">
+                🐷
+            </div>
+            <div>
+                <h1 class="font-display font-extrabold text-xl sm:text-2xl text-slate-900 tracking-tight">Tiết Kiệm Tiền</h1>
+                <p class="text-xs sm:text-sm text-slate-500">Tran Quoc Dat</p>
+            </div>
+        </div>
+
+        <button onclick="openResetModal()" class="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-500 hover:text-rose-600 bg-white/80 hover:bg-rose-50 px-3.5 py-2 rounded-xl border border-slate-200/80 transition-all shadow-sm">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Đặt lại dữ liệu</span>
+            <span class="sm:hidden">Reset</span>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto px-4 mt-2 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Column: Goal Overview & Actions (7 cols on desktop) -->
+        <div class="lg:col-span-7 flex flex-col gap-6">
+            
+            <!-- Card 1: Tổng quan & Mục tiêu -->
+            <section class="glass-card rounded-3xl p-6 sm:p-7 shadow-xl shadow-slate-200/50 relative overflow-hidden">
+                <!-- Decorative blob -->
+                <div class="absolute -right-10 -top-10 w-40 h-40 bg-pink-200/40 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div class="flex items-start justify-between gap-4 relative z-10">
+                    <div>
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-700 mb-2">
+                            <i data-lucide="target" class="w-3.5 h-3.5"></i>
+                            Mục tiêu hiện tại
+                        </span>
+                        <h2 id="goal-title-display" class="font-display font-bold text-xl sm:text-2xl text-slate-800">
+                            Mua MacBook / Đồ công nghệ
+                        </h2>
+                    </div>
+                    <button onclick="openGoalModal()" class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-pink-600 bg-slate-100/90 hover:bg-pink-50 px-3 py-2 rounded-xl transition-colors shrink-0">
+                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                        Sửa mục tiêu
+                    </button>
+                </div>
+
+                <!-- Số dư hiện tại -->
+                <div class="mt-6 relative z-10">
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Số dư trong heo</p>
+                    <div class="flex items-baseline gap-2 mt-1 flex-wrap">
+                        <span id="current-balance-display" class="font-display font-extrabold text-3xl sm:text-4xl text-slate-900 tracking-tight">
+                            0 ₫
+                        </span>
+                        <span class="text-sm text-slate-400 font-medium">
+                            / <span id="goal-amount-display">5.000.000 ₫</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Thanh tiến trình (Progress Bar) -->
+                <div class="mt-6 relative z-10">
+                    <div class="flex items-center justify-between text-xs sm:text-sm font-semibold mb-2">
+                        <span id="progress-status-text" class="text-pink-600">Tiến độ: 0%</span>
+                        <span id="remaining-amount-text" class="text-slate-500">Còn thiếu: 5.000.000 ₫</span>
+                    </div>
+                    
+                    <div class="w-full h-4 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/60">
+                        <div id="progress-bar-fill" class="h-full rounded-full bg-gradient-to-r from-pink-500 via-rose-500 to-amber-400 transition-all duration-700 ease-out relative" style="width: 0%">
+                            <div class="absolute inset-0 bg-white/20 w-full h-full animate-pulse"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Banner Chúc mừng khi đạt 100% -->
+                <div id="goal-achieved-banner" class="hidden mt-5 p-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="text-2xl">🎉</div>
+                        <div>
+                            <h3 class="font-bold text-sm sm:text-base">Tuyệt vời! Bạn đã hoàn thành mục tiêu!</h3>
+                            <p class="text-xs text-emerald-50">Bạn có thể tiếp tục tích lũy hoặc đặt mục tiêu mới lớn hơn.</p>
+                        </div>
+                    </div>
+                    <button onclick="triggerConfetti()" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-xl text-xs font-semibold shrink-0 transition">
+                        Ăn mừng 🎊
+                    </button>
+                </div>
+            </section>
+
+            <!-- Card 2: Bỏ heo (Nạp) & Rút tiền -->
+            <section class="glass-card rounded-3xl p-6 sm:p-7 shadow-xl shadow-slate-200/50">
+                <!-- Tabs chuyển đổi Nạp / Rút -->
+                <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-100/90 rounded-2xl mb-6">
+                    <button id="tab-deposit" onclick="switchTransactionMode('deposit')" class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all bg-white text-emerald-600 shadow-sm">
+                        <i data-lucide="piggy-bank" class="w-4 h-4"></i>
+                        Bỏ heo (Nạp)
+                    </button>
+                    <button id="tab-withdraw" onclick="switchTransactionMode('withdraw')" class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all text-slate-500 hover:text-slate-700">
+                        <i data-lucide="wallet" class="w-4 h-4"></i>
+                        Rút tiền
+                    </button>
+                </div>
+
+                <!-- Form giao dịch -->
+                <form id="transaction-form" onsubmit="handleTransactionSubmit(event)" class="space-y-4">
+                    <div>
+                        <label for="amount-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Số tiền (VNĐ)
+                        </label>
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                id="amount-input" 
+                                inputmode="numeric"
+                                placeholder="Ví dụ: 50.000" 
+                                autocomplete="off"
+                                oninput="formatCurrencyInput(this)"
+                                class="w-full pl-4 pr-12 py-3.5 text-lg font-bold text-slate-900 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500 transition-all"
+                            >
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 select-none">₫</span>
+                        </div>
+                    </div>
+
+                    <!-- Các nút chọn nhanh mệnh giá -->
+                    <div>
+                        <p class="text-xs text-slate-400 mb-2 font-medium">Chọn nhanh mệnh giá (cộng dồn):</p>
+                        <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                            <button type="button" onclick="addQuickAmount(10000)" class="py-2 px-2 rounded-xl bg-slate-50 hover:bg-pink-50 text-slate-700 hover:text-pink-600 border border-slate-200/80 hover:border-pink-200 text-xs font-semibold transition active:scale-95">+10k</button>
+                            <button type="button" onclick="addQuickAmount(20000)" class="py-2 px-2 rounded-xl bg-slate-50 hover:bg-pink-50 text-slate-700 hover:text-pink-600 border border-slate-200/80 hover:border-pink-200 text-xs font-semibold transition active:scale-95">+20k</button>
+                            <button type="button" onclick="addQuickAmount(50000)" class="py-2 px-2 rounded-xl bg-slate-50 hover:bg-pink-50 text-slate-700 hover:text-pink-600 border border-slate-200/80 hover:border-pink-200 text-xs font-semibold transition active:scale-95">+50k</button>
+                            <button type="button" onclick="addQuickAmount(100000)" class="py-2 px-2 rounded-xl bg-slate-50 hover:bg-pink-50 text-slate-700 hover:text-pink-600 border border-slate-200/80 hover:border-pink-200 text-xs font-semibold transition active:scale-95">+100k</button>
+                            <button type="button" onclick="addQuickAmount(200000)" class="py-2 px-2 rounded-xl bg-slate-50 hover:bg-pink-50 text-slate-700 hover:text-pink-600 border border-slate-200/80 hover:border-pink-200 text-xs font-semibold transition active:scale-95">+200k</button>
+                            <button type="button" onclick="addQuickAmount(500000)" class="py-2 px-2 rounded-xl bg-slate-50 hover:bg-pink-50 text-slate-700 hover:text-pink-600 border border-slate-200/80 hover:border-pink-200 text-xs font-semibold transition active:scale-95">+500k</button>
+                        </div>
+                    </div>
+
+                    <!-- Ghi chú tùy chọn -->
+                    <div>
+                        <label for="note-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Ghi chú (tùy chọn)
+                        </label>
+                        <input 
+                            type="text" 
+                            id="note-input" 
+                            maxlength="60"
+                            placeholder="Ví dụ: Tiền ăn sáng dư, tiền thưởng..." 
+                            class="w-full px-4 py-3 text-sm text-slate-800 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500 transition-all"
+                        >
+                    </div>
+
+                    <!-- Nút Submit -->
+                    <button 
+                        type="submit" 
+                        id="submit-btn"
+                        class="w-full py-3.5 px-6 rounded-2xl font-bold text-white text-sm sm:text-base bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] flex items-center justify-center gap-2 mt-2"
+                    >
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        <span>Bỏ vào heo ngay</span>
+                    </button>
+                </form>
+            </section>
+        </div>
+
+        <!-- Right Column: Transaction History (5 cols on desktop) -->
+        <div class="lg:col-span-5">
+            <section class="glass-card rounded-3xl p-6 shadow-xl shadow-slate-200/50 h-full flex flex-col max-h-[650px]">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <div class="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                            <i data-lucide="history" class="w-4 h-4"></i>
+                        </div>
+                        <h3 class="font-display font-bold text-base sm:text-lg text-slate-800">Lịch sử giao dịch</h3>
+                    </div>
+                    <span id="transaction-count-badge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
+                        0 giao dịch
+                    </span>
+                </div>
+
+                <!-- Danh sách giao dịch -->
+                <div id="transaction-list" class="flex-1 overflow-y-auto space-y-3 pr-1">
+                    <!-- Nội dung sẽ được render bằng JS -->
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- MODAL 1: Chỉnh sửa mục tiêu -->
+    <div id="goal-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 transform transition-all">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="font-display font-bold text-lg text-slate-900 flex items-center gap-2">
+                    <span class="text-xl">🎯</span> Thiết lập mục tiêu
+                </h3>
+                <button onclick="closeGoalModal()" class="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveGoalSettings(event)" class="space-y-4">
+                <div>
+                    <label for="modal-goal-title" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                        Tên mục tiêu tiết kiệm
+                    </label>
+                    <input 
+                        type="text" 
+                        id="modal-goal-title" 
+                        required
+                        maxlength="50"
+                        placeholder="Ví dụ: Du lịch Đà Lạt, Mua iPhone..."
+                        class="w-full px-4 py-3 text-sm font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:bg-white focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500"
+                    >
+                </div>
+
+                <div>
+                    <label for="modal-goal-amount" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                        Số tiền mục tiêu (VNĐ)
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="modal-goal-amount" 
+                            inputmode="numeric"
+                            required
+                            oninput="formatCurrencyInput(this)"
+                            placeholder="10.000.000"
+                            class="w-full pl-4 pr-10 py-3 text-base font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:bg-white focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500"
+                        >
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">₫</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 pt-2">
+                    <button type="button" onclick="closeGoalModal()" class="flex-1 py-3 px-4 rounded-2xl font-semibold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+                        Hủy
+                    </button>
+                    <button type="submit" class="flex-1 py-3 px-4 rounded-2xl font-bold text-sm text-white bg-pink-600 hover:bg-pink-700 shadow-lg shadow-pink-600/25 transition">
+                        Lưu mục tiêu
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Xác nhận Reset dữ liệu -->
+    <div id="reset-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center">
+            <div class="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="alert-triangle" class="w-7 h-7"></i>
+            </div>
+            <h3 class="font-display font-bold text-lg text-slate-900">Đặt lại toàn bộ dữ liệu?</h3>
+            <p class="text-sm text-slate-500 mt-2">
+                Hành động này sẽ xóa toàn bộ lịch sử giao dịch và đưa số dư heo đất về <strong class="text-slate-700">0 ₫</strong>. Không thể hoàn tác!
+            </p>
+            <div class="flex items-center gap-3 mt-6">
+                <button onclick="closeResetModal()" class="flex-1 py-2.5 px-4 rounded-2xl font-semibold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+                    Giữ lại
+                </button>
+                <button onclick="confirmResetData()" class="flex-1 py-2.5 px-4 rounded-2xl font-bold text-sm text-white bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-600/25 transition">
+                    Xóa tất cả
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // ==========================================
+        // 1. QUẢN LÝ TRẠNG THÁI & LƯU TRỮ (STATE)
+        // ==========================================
+        const STORAGE_KEY = 'piggy_bank_app_data_v1';
+
+        const defaultState = {
+            goalTitle: 'Mua đồ công nghệ mơ ước',
+            goalAmount: 10000000, // 10 triệu VNĐ
+            balance: 0,
+            transactions: [],
+            celebratedGoal: false // Đánh dấu đã bắn pháo hoa cho mục tiêu hiện tại chưa
+        };
+
+        let appState = { ...defaultState };
+        let currentMode = 'deposit'; // 'deposit' (nạp) hoặc 'withdraw' (rút)
+
+        // Tải dữ liệu từ localStorage khi mở trang
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    appState = { ...defaultState, ...parsed };
+                }
+            } catch (error) {
+                console.error('Lỗi khi đọc dữ liệu từ localStorage:', error);
+            }
+        }
+
+        // Lưu dữ liệu vào localStorage
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            } catch (error) {
+                console.error('Lỗi khi lưu dữ liệu:', error);
+                showToast('Không thể lưu dữ liệu vào trình duyệt!', 'error');
+            }
+        }
+
+        // ==========================================
+        // 2. TIỆN ÍCH ĐỊNH DẠNG TIỀN TỆ & NGÀY GIỜ
+        // ==========================================
+        function formatVND(amount) {
+            return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫';
+        }
+
+        // Tự động thêm dấu chấm phân cách hàng nghìn khi người dùng gõ số
+        function formatCurrencyInput(inputElement) {
+            let rawValue = inputElement.value.replace(/\D/g, '');
+            if (!rawValue) {
+                inputElement.value = '';
+                return;
+            }
+            // Giới hạn tối đa 15 chữ số để tránh tràn số
+            if (rawValue.length > 15) {
+                rawValue = rawValue.slice(0, 15);
+            }
+            inputElement.value = new Intl.NumberFormat('vi-VN').format(parseInt(rawValue, 10));
+        }
+
+        // Chuyển chuỗi có dấu chấm ("50.000") thành số nguyên (50000)
+        function parseCurrencyInput(formattedString) {
+            const cleaned = formattedString.replace(/\D/g, '');
+            return cleaned ? parseInt(cleaned, 10) : 0;
+        }
+
+        function formatDateTime(isoString) {
+            const date = new Date(isoString);
+            const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            return `${timeStr} • ${dateStr}`;
+        }
+
+        // ==========================================
+        // 3. CẬP NHẬT GIAO DIỆN (UI RENDERING)
+        // ==========================================
+        function renderUI() {
+            // 1. Cập nhật thông tin mục tiêu & số dư
+            document.getElementById('goal-title-display').textContent = appState.goalTitle;
+            document.getElementById('current-balance-display').textContent = formatVND(appState.balance);
+            document.getElementById('goal-amount-display').textContent = formatVND(appState.goalAmount);
+
+            // 2. Tính toán tiến độ (%)
+            const rawPercent = appState.goalAmount > 0 ? (appState.balance / appState.goalAmount) * 100 : 0;
+            const clampedPercent = Math.min(100, Math.max(0, rawPercent));
+            const displayPercent = rawPercent >= 100 ? 100 : Math.floor(rawPercent * 10) / 10;
+
+            document.getElementById('progress-bar-fill').style.width = `${clampedPercent}%`;
+            document.getElementById('progress-status-text').textContent = `Tiến độ: ${displayPercent}%`;
+
+            const remaining = Math.max(0, appState.goalAmount - appState.balance);
+            const remainingTextEl = document.getElementById('remaining-amount-text');
+            const achievedBanner = document.getElementById('goal-achieved-banner');
+
+            if (appState.balance >= appState.goalAmount && appState.goalAmount > 0) {
+                remainingTextEl.textContent = 'Đã đạt 100% mục tiêu!';
+                remainingTextEl.className = 'text-emerald-600 font-bold';
+                achievedBanner.classList.remove('hidden');
+
+                // Bắn pháo hoa ăn mừng nếu vừa mới đạt mục tiêu
+                if (!appState.celebratedGoal) {
+                    appState.celebratedGoal = true;
+                    saveState();
+                    triggerConfetti();
+                }
+            } else {
+                remainingTextEl.textContent = `Còn thiếu: ${formatVND(remaining)}`;
+                remainingTextEl.className = 'text-slate-500';
+                achievedBanner.classList.add('hidden');
+            }
+
+            // 3. Render danh sách lịch sử giao dịch
+            renderTransactionHistory();
+        }
+
+        function renderTransactionHistory() {
+            const listContainer = document.getElementById('transaction-list');
+            const countBadge = document.getElementById('transaction-count-badge');
+            
+            countBadge.textContent = `${appState.transactions.length} giao dịch`;
+
+            if (appState.transactions.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="h-full min-h-[240px] flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                        <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl mb-3">
+                            🪙
+                        </div>
+                        <p class="font-semibold text-slate-600 text-sm">Chưa có giao dịch nào</p>
+                        <p class="text-xs mt-1 max-w-[220px]">Hãy bắt đầu bỏ những đồng tiền tiết kiệm đầu tiên vào heo nhé!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listContainer.innerHTML = appState.transactions.map(tx => {
+                const isDeposit = tx.type === 'deposit';
+                const iconBg = isDeposit ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600';
+                const amountColor = isDeposit ? 'text-emerald-600' : 'text-rose-600';
+                const sign = isDeposit ? '+' : '-';
+                const iconName = isDeposit ? 'arrow-down-left' : 'arrow-up-right';
+                const defaultNote = isDeposit ? 'Bỏ heo tiết kiệm' : 'Rút tiền từ heo';
+
+                return `
+                    <div class="group flex items-center justify-between p-3.5 rounded-2xl bg-white/90 hover:bg-white border border-slate-100 hover:border-slate-200 shadow-sm transition-all">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0">
+                                <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-sm text-slate-800 truncate">
+                                    ${escapeHTML(tx.note || defaultNote)}
+                                </p>
+                                <p class="text-xs text-slate-400 mt-0.5">
+                                    ${formatDateTime(tx.timestamp)}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2.5 shrink-0 ml-2">
+                            <span class="font-display font-bold text-sm sm:text-base ${amountColor}">
+                                ${sign}${formatVND(tx.amount)}
+                            </span>
+                            <button 
+                                onclick="deleteTransaction('${tx.id}')" 
+                                title="Xóa giao dịch & hoàn tác số dư"
+                                class="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                            >
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Re-initialize Lucide icons cho các phần tử mới render
+            lucide.createIcons();
+        }
+
+        // Chống XSS khi hiển thị ghi chú người dùng nhập
+        function escapeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ==========================================
+        // 4. XỬ LÝ TƯƠNG TÁC NGƯỜI DÙNG
+        // ==========================================
+        function switchTransactionMode(mode) {
+            currentMode = mode;
+            const tabDeposit = document.getElementById('tab-deposit');
+            const tabWithdraw = document.getElementById('tab-withdraw');
+            const submitBtn = document.getElementById('submit-btn');
+
+            if (mode === 'deposit') {
+                tabDeposit.className = 'flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all bg-white text-emerald-600 shadow-sm';
+                tabWithdraw.className = 'flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all text-slate-500 hover:text-slate-700';
+                
+                submitBtn.className = 'w-full py-3.5 px-6 rounded-2xl font-bold text-white text-sm sm:text-base bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/25 transition-all active:scale-[0.99] flex items-center justify-center gap-2 mt-2';
+                submitBtn.innerHTML = `<i data-lucide="plus-circle" class="w-5 h-5"></i><span>Bỏ vào heo ngay</span>`;
+            } else {
+                tabWithdraw.className = 'flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all bg-white text-rose-600 shadow-sm';
+                tabDeposit.className = 'flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-sm transition-all text-slate-500 hover:text-slate-700';
+                
+                submitBtn.className = 'w-full py-3.5 px-6 rounded-2xl font-bold text-white text-sm sm:text-base bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 shadow-lg shadow-rose-500/25 transition-all active:scale-[0.99] flex items-center justify-center gap-2 mt-2';
+                submitBtn.innerHTML = `<i data-lucide="minus-circle" class="w-5 h-5"></i><span>Xác nhận rút tiền</span>`;
+            }
+            lucide.createIcons();
+        }
+
+        // Cộng dồn mệnh giá khi bấm nút chọn nhanh
+        function addQuickAmount(value) {
+            const amountInput = document.getElementById('amount-input');
+            const currentVal = parseCurrencyInput(amountInput.value);
+            const newVal = currentVal + value;
+            amountInput.value = new Intl.NumberFormat('vi-VN').format(newVal);
+        }
+
+        // Xử lý Nạp / Rút tiền
+        function handleTransactionSubmit(event) {
+            event.preventDefault();
+            const amountInput = document.getElementById('amount-input');
+            const noteInput = document.getElementById('note-input');
+
+            const amount = parseCurrencyInput(amountInput.value);
+            const note = noteInput.value.trim();
+
+            if (amount <= 0) {
+                showToast('Vui lòng nhập số tiền lớn hơn 0 ₫!', 'error');
+                amountInput.focus();
+                return;
+            }
+
+            if (currentMode === 'withdraw') {
+                if (amount > appState.balance) {
+                    showToast(`Số dư không đủ! Bạn chỉ có ${formatVND(appState.balance)} trong heo.`, 'error');
+                    amountInput.focus();
+                    return;
+                }
+                appState.balance -= amount;
+                // Nếu rút xuống dưới mục tiêu, reset cờ ăn mừng để lần sau đạt lại sẽ ăn mừng tiếp
+                if (appState.balance < appState.goalAmount) {
+                    appState.celebratedGoal = false;
+                }
+                showToast(`Đã rút ${formatVND(amount)} từ heo đất.`, 'info');
+            } else {
+                appState.balance += amount;
+                animatePiggy();
+                showToast(`Tuyệt vời! Đã bỏ thêm ${formatVND(amount)} vào heo.`, 'success');
+            }
+
+            // Tạo bản ghi lịch sử mới
+            const newTransaction = {
+                id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+                type: currentMode,
+                amount: amount,
+                note: note,
+                timestamp: new Date().toISOString()
+            };
+
+            appState.transactions.unshift(newTransaction);
+            saveState();
+            renderUI();
+
+            // Xóa trắng form
+            amountInput.value = '';
+            noteInput.value = '';
+        }
+
+        // Xóa một giao dịch và hoàn tác số dư
+        function deleteTransaction(id) {
+            const txIndex = appState.transactions.findIndex(t => t.id === id);
+            if (txIndex === -1) return;
+
+            const tx = appState.transactions[txIndex];
+
+            // Kiểm tra xem nếu hoàn tác giao dịch nạp có làm số dư bị âm không
+            if (tx.type === 'deposit' && appState.balance < tx.amount) {
+                showToast('Không thể xóa giao dịch nạp này vì số tiền đã được rút ra trước đó!', 'error');
+                return;
+            }
+
+            if (tx.type === 'deposit') {
+                appState.balance -= tx.amount;
+                if (appState.balance < appState.goalAmount) {
+                    appState.celebratedGoal = false;
+                }
+            } else {
+                appState.balance += tx.amount;
+            }
+
+            appState.transactions.splice(txIndex, 1);
+            saveState();
+            renderUI();
+            showToast('Đã xóa giao dịch và cập nhật lại số dư.', 'info');
+        }
+
+        // Hiệu ứng nảy icon con heo
+        function animatePiggy() {
+            const piggy = document.getElementById('header-piggy');
+            piggy.classList.remove('animate-piggy');
+            void piggy.offsetWidth; // Trigger reflow
+            piggy.classList.add('animate-piggy');
+        }
+
+        // ==========================================
+        // 5. QUẢN LÝ MODAL MỤC TIÊU & RESET
+        // ==========================================
+        function openGoalModal() {
+            const modal = document.getElementById('goal-modal');
+            document.getElementById('modal-goal-title').value = appState.goalTitle;
+            document.getElementById('modal-goal-amount').value = new Intl.NumberFormat('vi-VN').format(appState.goalAmount);
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeGoalModal() {
+            const modal = document.getElementById('goal-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveGoalSettings(event) {
+            event.preventDefault();
+            const titleVal = document.getElementById('modal-goal-title').value.trim();
+            const amountVal = parseCurrencyInput(document.getElementById('modal-goal-amount').value);
+
+            if (!titleVal) {
+                showToast('Vui lòng nhập tên mục tiêu!', 'error');
+                return;
+            }
+            if (amountVal <= 0) {
+                showToast('Số tiền mục tiêu phải lớn hơn 0 ₫!', 'error');
+                return;
+            }
+
+            const isNewHigherGoal = amountVal > appState.goalAmount;
+            appState.goalTitle = titleVal;
+            appState.goalAmount = amountVal;
+            
+            if (isNewHigherGoal && appState.balance < amountVal) {
+                appState.celebratedGoal = false;
+            }
+
+            saveState();
+            renderUI();
+            closeGoalModal();
+            showToast('Đã cập nhật mục tiêu tiết kiệm!', 'success');
+        }
+
+        function openResetModal() {
+            const modal = document.getElementById('reset-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeResetModal() {
+            const modal = document.getElementById('reset-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function confirmResetData() {
+            appState = { ...defaultState, transactions: [] };
+            saveState();
+            renderUI();
+            closeResetModal();
+            showToast('Đã đặt lại toàn bộ dữ liệu về ban đầu.', 'info');
+        }
+
+        // ==========================================
+        // 6. HỆ THỐNG THÔNG BÁO (TOAST) & PHÁO HOA
+        // ==========================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = 'bg-slate-800 text-white';
+            let icon = 'info';
+
+            if (type === 'success') {
+                bgClass = 'bg-emerald-600 text-white shadow-emerald-600/20';
+                icon = 'check-circle-2';
+            } else if (type === 'error') {
+                bgClass = 'bg-rose-600 text-white shadow-rose-600/20';
+                icon = 'alert-circle';
+            }
+
+            toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium transform transition-all duration-300 translate-y-[-10px] opacity-0 ${bgClass}`;
+            toast.innerHTML = `
+                <i data-lucide="${icon}" class="w-4 h-4 shrink-0"></i>
+                <span>${escapeHTML(message)}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-[-10px]', 'opacity-0');
+            });
+
+            // Auto remove after 3.2s
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-[-10px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        // Hiệu ứng pháo giấy (Confetti) tự viết gọn nhẹ
+        function triggerConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const colors = ['#ec4899', '#10b981', '#f59e0b', '#6366f1', '#f43f5e', '#06b6d4'];
+            const particles = [];
+
+            for (let i = 0; i < 120; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    w: Math.random() * 10 + 6,
+                    h: Math.random() * 6 + 4,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    speedY: Math.random() * 3 + 2,
+                    speedX: Math.random() * 2 - 1,
+                    rotation: Math.random() * 360,
+                    rotationSpeed: Math.random() * 6 - 3
+                });
+            }
+
+            let animationFrameId;
+            let startTime = Date.now();
+
+            function renderConfetti() {
+                const elapsed = Date.now() - startTime;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                particles.forEach(p => {
+                    p.y += p.speedY;
+                    p.x += p.speedX;
+                    p.rotation += p.rotationSpeed;
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rotation * Math.PI) / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                    ctx.restore();
+                });
+
+                if (elapsed < 4000) {
+                    animationFrameId = requestAnimationFrame(renderConfetti);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    cancelAnimationFrame(animationFrameId);
+                }
+            }
+
+            renderConfetti();
+        }
+
+        // ==========================================
+        // 7. KHỞI CHẠY ỨNG DỤNG
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            renderUI();
+            lucide.createIcons();
+
+            // Easter egg: Bấm vào biểu tượng con heo trên header
+            document.getElementById('header-piggy').addEventListener('click', animatePiggy);
+        });
+    </script>
+</body>
+</html>
